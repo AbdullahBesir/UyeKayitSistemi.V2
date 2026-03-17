@@ -1,5 +1,6 @@
 import json
 import secrets
+import os
 import sqlite3
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -300,8 +301,10 @@ class AppHandler(SimpleHTTPRequestHandler):
 
 def main():
     init_db()
-    server = ThreadingHTTPServer(("127.0.0.1", 8000), AppHandler)
-    print("Server running: http://127.0.0.1:8000")
+    host = "0.0.0.0"
+    port = int(os.environ.get("PORT", "8000"))
+    server = ThreadingHTTPServer((host, port), AppHandler)
+    print(f"Server running: http://{host}:{port}")
     server.serve_forever()
 
 
