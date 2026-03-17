@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Üye Yönetim Sistemi</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: linear-gradient(180deg, #eef3fb 0%, #f7f9fc 100%);
+      color: #1e293b;
+    }
+    .hidden { display: none !important; }
+
+    .login {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .login-box {
+      width: 100%;
+      max-width: 380px;
+      background: rgba(255,255,255,0.96);
+      border: 1px solid #dbe5f3;
+      border-radius: 20px;
+      box-shadow: 0 20px 50px rgba(31, 42, 68, 0.15);
+      padding: 28px;
+    }
+    .login-box h1 { margin: 0 0 8px; font-size: 26px; }
+    .login-box p { margin: 0 0 18px; color: #64748b; font-size: 14px; }
+    .login-box input {
+      width: 100%;
+      margin-bottom: 12px;
+      padding: 12px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      background: #fff;
+      font-size: 14px;
+      outline: none;
+      transition: 0.2s;
+    }
+    .login-box input:focus,
+    .input:focus,
+    select:focus,
+    textarea.cell:focus,
+    input.cell:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 4px rgba(59,130,246,0.12);
+    }
+
+    button {
+      border: 1px solid #dbe5f3;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: 0.2s ease;
+      font-weight: 600;
+    }
+    .login-box button {
+      width: 100%;
+      padding: 12px 14px;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: white;
+      font-size: 14px;
+    }
+    .login-box button:hover,
+    button:hover { transform: translateY(-1px); filter: brightness(1.02); }
+    #loginError { margin-top: 10px; color: #dc2626; font-size: 13px; min-height: 18px; }
+    #loginMeta { margin-top: 4px; color: #64748b; font-size: 12px; min-height: 18px; }
+    .adaylar-alani{
+      display:flex;
+      align-items:flex-start;
+      gap:40px;
+    }
+
+    .kartlar {
+      display: flex;
+      gap: 20px;
+      width: 20cm;
+      flex-wrap: wrap; /* satır dolunca alta geçsin */
+    }
+
+    .kart {
+      width: 300px;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+      text-align: center;
+      font-family: Arial;
+      transition: 0.3s;
+    }
+
+    .kart img {
+      width: 100%;
+      height: 300px;
+      object-fit: cover;
+    }
+
+    .isim {
+      padding: 12px;
+      font-weight: bold;
+      font-size: 18px;
+    }
+
+    .isim-paneli {
+      width: 760px;
+      margin: 0;
+      background: #f7f7f7;
+      border-radius: 22px;
+      padding: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+    }
+
+    .isim-paneli-baslik {
+      font-size: 28px;
+      font-weight: 700;
+      color: #222;
+      margin-bottom: 18px;
+    }
+
+    .isim-tablo {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #isimSatirlari {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .isim-tablo-baslik {
+      display: grid;
+      grid-template-columns: 50px 1fr 100px;
+      gap: 8px;
+      padding: 8px 10px;
+      background: #ececec;
+      border-radius: 12px;
+      color: #444;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .isim-satir {
+      display: grid;
+      grid-template-columns: 50px 1fr 100px;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 10px;
+      background: #efefef;
+      border-radius: 12px;
+      color: #222;
+      min-height: 42px;
+      font-size: 13px;
+    }
+
+    .isim-hucre {
+      display: flex;
+      align-items: center;
+      min-height: 36px;
+      word-break: break-word;
+    }
+
+    .isim-aksiyon {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-start;
+    }
+
+    .isim-girdi {
+      width: 100%;
+      border: none;
+      outline: none;
+      border-radius: 10px;
+      padding: 6px 8px;
+      background: #ffffff;
+      font-size: 12px;
+      color: #222;
+    }
+
+    .isim-buton {
+      border: none;
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+
+    .isim-buton-duzenle {
+      background: #d9d9d9;
+      color: #222;
+    }
+
+    .isim-buton-duzenle:hover {
+      background: #cfcfcf;
+    }
+
+    .isim-buton-kaydet {
+      background: #222;
+      color: #fff;
+    }
+
+    .isim-buton-kaydet:hover {
+      background: #111;
+    }
+
+    .isim-buton-iptal {
+      background: #cccccc;
+      color: #222;
+    }
+
+    .isim-buton-iptal:hover {
+      background: #bdbdbd;
+    }
+
+    @media (max-width: 900px) {
+      #isimSatirlari {
+        grid-template-columns: 1fr;
+      }
+
+      .isim-tablo-baslik,
+      .isim-satir {
+        grid-template-columns: 50px 1fr 100px;
+      }
+    }
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 22px;
+      background: rgba(31, 42, 68, 0.96);
+      backdrop-filter: blur(10px);
+      color: white;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+    }
+    .brand { display: flex; flex-direction: column; gap: 2px; }
+    .brand strong { font-size: 18px; }
+    .brand span { font-size: 12px; color: #cbd5e1; }
+    .menu { display: flex; gap: 8px; flex-wrap: wrap; }
+    .menu button {
+      padding: 10px 14px;
+      background: transparent;
+      color: #e2e8f0;
+      border: 1px solid transparent;
+    }
+    .menu button.active,
+    .menu button:hover {
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.12);
+      color: white;
+    }
+
+    .container { padding: 20px; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .panel {
+      background: rgba(255,255,255,0.92);
+      border: 1px solid #dbe5f3;
+      border-radius: 20px;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+      padding: 18px;
+    }
+    .topbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .left-tools,
+    .right-tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+    .input,
+    select {
+      padding: 11px 13px;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      background: white;
+      outline: none;
+      min-width: 180px;
+      transition: 0.2s;
+    }
+
+    .btn-primary { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; padding: 11px 14px; }
+    .btn-success { background: linear-gradient(135deg, #22c55e, #16a34a); color: white; padding: 11px 14px; }
+    .btn-dark { background: linear-gradient(135deg, #334155, #1e293b); color: white; padding: 11px 14px; }
+    .btn-danger { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; padding: 8px 10px; }
+    .btn-light { background: #f8fafc; color: #0f172a; padding: 11px 14px; border: 1px solid #dbe5f3; }
+    .btn-link { background: #eff6ff; color: #1d4ed8; padding: 7px 10px; border: 1px solid #bfdbfe; }
+
+    .table-wrap {
+      overflow: auto;
+      border-radius: 18px;
+      border: none;
+      background: transparent;
+      resize: both;
+      min-width: 600px;
+      min-height: 280px;
+      max-width: 100%;
+      max-height: 80vh;
+      box-shadow: none;
+      outline: none;
+    }
+    table {
+      width: 100%;
+      min-width: 4300px;
+      border-collapse: collapse;
+      border-spacing: 0;
+      background: transparent;
+    }
+    thead tr { background: #d9dde2; }
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #d9dde2;
+      color: #334155;
+      font-size: 13px;
+      white-space: nowrap;
+      user-select: none;
+      border: none;
+      outline: none;
+      box-shadow: none;
+      padding: 10px 12px;
+      text-align: left;
+    }
+    td {
+      padding: 10px 8px;
+      vertical-align: top;
+      text-align: left;
+      background: transparent;
+      border: none;
+      outline: none;
+      box-shadow: none;
+    }
+
+    th .col-resizer {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 3px;
+      height: 100%;
+      cursor: col-resize;
+      user-select: none;
+      background: rgba(148, 163, 184, 0.35);
+      transition: background 0.15s ease, width 0.15s ease;
+    }
+    th:hover .col-resizer {
+      width: 4px;
+      background: rgba(59, 130, 246, 0.8);
+    }
+
+    .cell,
+    textarea.cell {
+      width: 100%;
+      min-width: 120px;
+      border: 1px solid #c7d0dd;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #ffffff;
+      outline: none;
+      transition: 0.2s;
+      font: inherit;
+    }
+    textarea.cell {
+      min-width: 220px;
+      min-height: 72px;
+      resize: vertical;
+    }
+
+    .vote {
+      min-width: 96px;
+      text-align: center;
+      color: white;
+      font-weight: 700;
+      border-radius: 999px;
+      padding: 10px 12px;
+      cursor: pointer;
+      user-select: none;
+      transition: 0.2s;
+    }
+    .vote.none { background: #94a3b8; }
+    .vote.hayir { background: #ef4444; }
+    .vote.orta { background: #f59e0b; }
+    .vote.evet { background: #22c55e; }
+    .vote.disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+      transform: none !important;
+      filter: grayscale(0.2);
+    }
+    .vote:hover { transform: scale(1.02); }
+
+    tr.row-none { background: rgba(148, 163, 184, 0.06); }
+    tr.row-hayir { background: rgba(239, 68, 68, 0.10); }
+    tr.row-orta { background: rgba(245, 158, 11, 0.10); }
+    tr.row-evet { background: rgba(34, 197, 94, 0.10); }
+    tr.row-excluded { background: rgba(15, 23, 42, 0.14) !important; }
+    tr.filtered-row td { box-shadow: inset 0 -2px 0 rgba(220, 38, 38, 0.75); }
+
+    .meta { font-size: 12px; color: #64748b; min-width: 150px; white-space: nowrap; }
+    .footer-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      margin-top: 14px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 18px;
+    }
+    .card {
+      background: white;
+      border: 1px solid #dbe5f3;
+      border-radius: 18px;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+      overflow: hidden;
+    }
+    .card img {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+      display: block;
+      background: #e2e8f0;
+    }
+    .card-body { padding: 14px; }
+    .card-body h3 { margin: 0 0 10px; font-size: 18px; }
+    .card-body p { margin: 6px 0; color: #475569; font-size: 14px; }
+    .card-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    .stat-box {
+      background: white;
+      border: 1px solid #dbe5f3;
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+    }
+    .stat-box small { display: block; color: #64748b; margin-bottom: 8px; }
+    .stat-box strong { font-size: 28px; }
+    .chart-box {
+      background: white;
+      border: 1px solid #dbe5f3;
+      border-radius: 20px;
+      padding: 18px;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+      max-width: 760px;
+    }
+    .empty {
+      padding: 30px;
+      text-align: center;
+      color: #64748b;
+      background: white;
+      border: 1px dashed #cbd5e1;
+      border-radius: 18px;
+    }
+    .section-title { margin: 0 0 14px; font-size: 24px; }
+    .subtle { color: #64748b; margin-bottom: 16px; }
+
+    .context-menu {
+      position: fixed;
+      z-index: 200;
+      min-width: 250px;
+      background: white;
+      border: 1px solid #dbe5f3;
+      border-radius: 14px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+      padding: 10px;
+    }
+    .context-menu-title {
+      font-size: 12px;
+      color: #64748b;
+      padding: 4px 4px 10px;
+      margin-bottom: 10px;
+    }
+    .context-menu .input {
+      width: 100%;
+      min-width: 0;
+      margin-bottom: 8px;
+      padding: 10px 12px;
+    }
+    .context-menu button {
+      width: 100%;
+      text-align: left;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: white;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+    .context-menu button:hover { background: #eff6ff; transform: none; }
+
+    .hidden-columns-box {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .hidden-chip {
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: #fff7ed;
+      color: #9a3412;
+      border: 1px solid #fdba74;
+      font-size: 13px;
+    }
+
+    .image-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 180px;
+    }
+    .link-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 150px;
+    }
+    .inline-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .link-preview {
+      color: #2563eb;
+      text-decoration: underline;
+      font-size: 13px;
+      cursor: pointer;
+      word-break: break-word;
+    }
+    .thumb {
+      width: 92px;
+      height: 92px;
+      border-radius: 12px;
+      object-fit: cover;
+      border: 1px solid #dbe5f3;
+      background: #e2e8f0;
+      display: block;
+    }
+    .mini-note { font-size: 12px; color: #64748b; }
+    .kart:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+    }
+    @media (max-width: 900px) {
+      nav { align-items: flex-start; gap: 14px; flex-direction: column; }
+      .topbar { flex-direction: column; align-items: stretch; }
+      .left-tools, .right-tools { width: 100%; }
+      .input, select { width: 100%; min-width: 0; }
+      .footer-actions { justify-content: stretch; }
+      .footer-actions button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div id="loginPage" class="login">
+    <div class="login-box">
+      <h1>Üye Yönetim Sistemi</h1>
+      <p>Panele giriş yapmak için kullanıcı bilgilerini gir.</p>
+      <input id="user" placeholder="Kullanıcı adı" />
+      <input id="pass" placeholder="Şifre" type="password" />
+      <button id="loginButton" type="button" onclick="login()">Giriş Yap</button>
+      <div id="loginError"></div>
+      <div id="loginMeta"></div>
+    </div>
+  </div>
+
+  <div id="app" class="hidden">
+    <nav>
+      <div class="brand">
+        <strong>Üye Yönetim Sistemi</strong>
+        <span>Tek sayfa panel • kayıt • grafik • geçmiş • ziyaret takibi</span>
+      </div>
+      <div class="menu">
+        <button id="nav-ana" class="active" type="button" onclick="showPage('ana')">ANASAYFA</button>
+        <button id="nav-kayit" type="button" onclick="showPage('kayit')">KAYITLAR</button>
+        <button id="nav-grafik" type="button" onclick="showPage('grafik')">GRAFİK</button>
+      </div>
+    </nav>
+
+    <div id="ana" class="page active container">
+      <h2 class="section-title">30.Komite Seçim Programı <br> <div style="font-weight: 600;">Meclis Üyesi Adayları<span style="margin-left:14.5cm;">Komite Üyesi Adayları</span></div></h2>
+      <div class="subtle">
+        <div class="adaylar-alani">
+          <div class="kartlar">
+            <div class="kart">
+              <img src="">
+              <div class="isim"><i>1.Meclis Üyesi Adayı</i> <br>Muhammet Yavuz ŞİMŞEK</div>
+            </div>
+            <div class="kart">
+              <img src="">
+              <div class="isim"><i>2.Meclis Üyesi Adayı</i> <br>Mehmet Fahri Yılmaz</div>
+            </div>
+          </div>
+          <div class="isim-paneli">
+            <div class="isim-paneli-baslik">İsim Listesi</div>
+
+            <div class="isim-tablo">
+              <div class="isim-tablo-baslik">
+                <div class="isim-hucre">ID</div>
+                <div class="isim-hucre">İsim</div>
+                <div class="isim-hucre isim-hucre-son">İşlem</div>
+              </div>
+
+              <div id="isimSatirlari"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="topbar">
+          <div class="left-tools">
+            <select id="oyFiltre" onchange="filtre()">
+              <option value="">Tüm Oylar</option>
+              <option value="EVET">EVET</option>
+              <option value="ORTA">ORTA</option>
+              <option value="HAYIR">HAYIR</option>
+              <option value="SEÇ">SEÇ</option>
+            </select>
+            <button type="button" class="btn-light" onclick="filtreTemizle()">Filtreyi Temizle</button>
+          </div>
+          <div class="right-tools">
+            <button type="button" class="btn-primary" onclick="satirEkle()">Yeni Satır</button>
+            <button type="button" class="btn-link" onclick="klasorSec()">Resim Klasörü Seç</button>
+            <label class="btn-link" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
+              Excel'den Yükle
+              <input id="excelInput" type="file" accept=".xlsx,.xls" onchange="exceldenYukle(this)" style="display:none;">
+            </label>
+            <button type="button" class="btn-light" onclick="tabloTemizle()">Tabloyu Temizle</button>
+            <button type="button" class="btn-light" onclick="sonKaydiYukle()">Son Kaydı Yükle</button>
+          </div>
+        </div>
+
+        <div id="tableArea" class="table-wrap">
+          <table id="tablo">
+            <thead>
+              <tr id="tableHeaderRow"></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div id="folderInfo" class="hidden"></div>
+        <div class="hidden-columns-box" id="hiddenColumnsBox"></div>
+
+        <div class="footer-actions">
+          <button type="button" class="btn-success" onclick="tumunuKaydet()">Kaydet</button>
+          <button type="button" class="btn-dark" onclick="excel()">Excel'e Aktar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="kayit" class="page container">
+      <h2 class="section-title">Kayıtlar</h2>
+      <div class="subtle">Kaydedilen her sürüm burada kart olarak saklanır. İstersen geri yükleyebilirsin.</div>
+      <div id="cards"></div>
+    </div>
+
+    <div id="grafik" class="page container">
+      <h2 class="section-title">Grafik</h2>
+      <div class="subtle">Grafik yalnızca Askı Olma Durumu = Hayır ve 2 Yıl Olma Durumu = Hayır olan satırları sayar.</div>
+
+      <div class="stats">
+        <div class="stat-box"><small>Toplam Dahil Satır</small><strong id="statTotal">0</strong></div>
+        <div class="stat-box"><small>EVET</small><strong id="statEvet">0</strong></div>
+        <div class="stat-box"><small>ORTA</small><strong id="statOrta">0</strong></div>
+        <div class="stat-box"><small>HAYIR</small><strong id="statHayir">0</strong></div>
+      </div>
+
+      <div class="chart-box">
+        <canvas id="chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script id="legacyScript" type="application/disabled-javascript">
+    const LOGIN_USER = 'besir';
+    const LOGIN_PASS = 'Mys7806720';
+    const STORAGE_HISTORY = 'uye_history';
+    const STORAGE_SESSION = 'uye_logged_in';
+    const STORAGE_DRAFT = 'uye_draft';
+    const STORAGE_HIDDEN_COLUMNS = 'uye_hidden_columns';
+    const STORAGE_IMAGE_DIR = 'uye_image_dir_name';
+
+    const COLUMN_TITLES = [
+      'Resim', 'Üye Sicil', 'Ticaret Sicil', 'Mersis No', 'Nace Kodu', 'Vergi No', 'Meslek Grubu', 'Ünvan', 'Adres',
+      'Yetkili Adı-1', 'Yetkili Adı-2', 'Yetkili Adı-3', 'Firma Sabit Tel', 'Yetkili GSM.1', 'Yetkili GSM.2', 'Yetkili GSM.3',
+      'E-mail', 'Instagram', 'Facebook', 'X', 'Linkedin', 'Referans.1', 'Referans.2', 'Referans.3', 'Not',
+      'Askı Durumu', '2 Yıl Durumu', 'Ziyaret 1', 'Ziyaret 1 Notu', 'Ziyaret 1 Tarihi', 'Ziyaret 2', 'Ziyaret 2 Notu',
+      'Ziyaret 2 Tarihi', 'Ziyaret 3', 'Ziyaret 3 Notu', 'Ziyaret 3 Tarihi', 'Oy', 'Tarih'
+    ];
+
+    let chartInstance = null;
+    let activeColumnFilter = null;
+    let imageDirectoryHandle = null;
+
+    function qs(id) { return document.getElementById(id); }
+
+    function login() {
+      const username = qs('user').value.trim();
+      const password = qs('pass').value;
+      const errorBox = qs('loginError');
+      if (username === LOGIN_USER && password === LOGIN_PASS) {
+        localStorage.setItem(STORAGE_SESSION, '1');
+        errorBox.textContent = '';
+        qs('loginPage').classList.add('hidden');
+        qs('app').classList.remove('hidden');
+        initializeApp();
+      } else {
+        errorBox.textContent = 'Kullanıcı adı veya şifre hatalı.';
+      }
+    }
+
+    function initializeApp() {
+      if (qs('tablo').querySelector('tbody').children.length === 0) {
+        const draft = getDraft();
+        if (draft.length) renderRows(draft); else satirEkle();
+      }
+      applyHiddenColumns();
+      renderHiddenColumns();
+      renderHistory();
+      loadChart();
+    }
+
+    function showPage(id) {
+      document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+      qs(id).classList.add('active');
+      document.querySelectorAll('.menu button').forEach(btn => btn.classList.remove('active'));
+      qs('nav-' + id).classList.add('active');
+      if (id === 'kayit') renderHistory();
+      if (id === 'grafik') loadChart();
+    }
+
+    function escapeHtml(text) {
+      return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function hucre(value = '', type = 'text') {
+      const safe = escapeHtml(value);
+      if (type === 'note') {
+        return `<textarea class="cell" oninput="autoSaveDraft()">${safe}</textarea>`;
+      }
+      return `<input class="cell" value="${safe}" oninput="autoSaveDraft()">`;
+    }
+
+    function oyDiv(value = 'SEÇ') {
+      const map = { 'SEÇ': 'none', 'HAYIR': 'hayir', 'ORTA': 'orta', 'EVET': 'evet' };
+      return `<div class="vote ${map[value] || 'none'}" onclick="oyDegistir(this)" data-val="${escapeHtml(value)}">${escapeHtml(value)}</div>`;
+    }
+
+    function evetHayirSelect(value = 'EVET', cls = '') {
+      return `<select class="cell ${cls}" onchange="durumDegisti(this)"><option value="EVET" ${value === 'EVET'  'selected' : ''}>Evet</option><option value="HAYIR" ${value === 'HAYIR'  'selected' : ''}>Hayır</option></select>`;
+    }
+
+    function tarih() {
+      return new Date().toLocaleString('tr-TR');
+    }
+
+    function makeLink(url, type) {
+      const value = (url || '').trim();
+      if (!value) return '';
+      let href = value;
+      if (type === 'phone') href = 'tel:' + value.replace(/\s+/g, '');
+      if (type === 'email') href = value.startsWith('mailto:')  value : 'mailto:' + value;
+      if (type === 'social' && !/^https:\/\//i.test(value)) href = 'https://' + value;
+      return `<a class="link-preview" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">Bağlantıyı Aç</a>`;
+    }
+
+    function imageCell(value = '') {
+      const safe = escapeHtml(value);
+      return `
+        <div class="image-cell" style="display:flex; flex-direction:row; gap:10px; align-items:flex-start; min-width:260px;">
+          <img class="thumb" src="${safe || ''}" onerror="this.style.visibility='hidden'" onload="this.style.visibility='visible'">
+          <div style="display:flex; flex-direction:column; gap:8px; min-width:150px; flex:1;">
+            <input class="cell" placeholder="Resim yolu / veri / URL" value="${safe}" oninput="resimInputDegisti(this)">
+            <div class="inline-actions">
+              <input type="file" accept="image/*" onchange="resimSec(this)">
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function actionCell(value = '', type = 'text', linkType = '') {
+      const safe = escapeHtml(value);
+      const link = linkType  makeLink(value, linkType) : '';
+      return `
+        <div class="link-cell">
+          ${type === 'note'  `<textarea class="cell" oninput="autoSaveDraft()">${safe}</textarea>` : `<input class="cell" value="${safe}" oninput="autoSaveDraft()">`}
+          ${link}
+        </div>
+      `;
+    }
+
+    function satirEkle(data = null) {
+      const tr = document.createElement('tr');
+      const values = data && Array.isArray(data.veri)  data.veri : Array(25).fill('');
+      const aski = data && data.aski  data.aski : 'EVET';
+      const ikiYil = data && data.ikiYil  data.ikiYil : 'EVET';
+      const ziyaret1 = data && data.ziyaret1  data.ziyaret1 : 'EVET';
+      const ziyaret1Not = data && data.ziyaret1Not  data.ziyaret1Not : '';
+      const ziyaret1Tarih = data && data.ziyaret1Tarih  data.ziyaret1Tarih : '';
+      const ziyaret2 = data && data.ziyaret2  data.ziyaret2 : 'EVET';
+      const ziyaret2Not = data && data.ziyaret2Not  data.ziyaret2Not : '';
+      const ziyaret2Tarih = data && data.ziyaret2Tarih  data.ziyaret2Tarih : '';
+      const ziyaret3 = data && data.ziyaret3  data.ziyaret3 : 'EVET';
+      const ziyaret3Not = data && data.ziyaret3Not  data.ziyaret3Not : '';
+      const ziyaret3Tarih = data && data.ziyaret3Tarih  data.ziyaret3Tarih : '';
+      const oy = data && data.oy  data.oy : 'SEÇ';
+      const rowDate = data && data.tarih  data.tarih : tarih();
+
+      tr.innerHTML = `
+        <td>${imageCell(values[0] || '')}</td>
+        <td>${hucre(values[1] || '')}</td>
+        <td>${hucre(values[2] || '')}</td>
+        <td>${hucre(values[3] || '')}</td>
+        <td>${hucre(values[4] || '')}</td>
+        <td>${hucre(values[5] || '')}</td>
+        <td>${hucre(values[6] || '')}</td>
+        <td>${hucre(values[7] || '')}</td>
+        <td>${hucre(values[8] || '')}</td>
+        <td>${hucre(values[9] || '')}</td>
+        <td>${hucre(values[10] || '')}</td>
+        <td>${hucre(values[11] || '')}</td>
+        <td>${actionCell(values[12] || '', 'text', 'phone')}</td>
+        <td>${actionCell(values[13] || '', 'text', 'phone')}</td>
+        <td>${actionCell(values[14] || '', 'text', 'phone')}</td>
+        <td>${actionCell(values[15] || '', 'text', 'phone')}</td>
+        <td>${actionCell(values[16] || '', 'text', 'email')}</td>
+        <td>${actionCell(values[17] || '', 'text', 'social')}</td>
+        <td>${actionCell(values[18] || '', 'text', 'social')}</td>
+        <td>${actionCell(values[19] || '', 'text', 'social')}</td>
+        <td>${actionCell(values[20] || '', 'text', 'social')}</td>
+        <td>${hucre(values[21] || '')}</td>
+        <td>${hucre(values[22] || '')}</td>
+        <td>${hucre(values[23] || '')}</td>
+        <td>${actionCell(values[24] || '', 'note')}</td>
+        <td>${evetHayirSelect(aski, 'aski-select')}</td>
+        <td>${evetHayirSelect(ikiYil, 'ikiyil-select')}</td>
+        <td>${evetHayirSelect(ziyaret1, 'ziyaret1-select')}</td>
+        <td>${actionCell(ziyaret1Not, 'note')}</td>
+        <td>${hucre(ziyaret1Tarih)}</td>
+        <td>${evetHayirSelect(ziyaret2, 'ziyaret2-select')}</td>
+        <td>${actionCell(ziyaret2Not, 'note')}</td>
+        <td>${hucre(ziyaret2Tarih)}</td>
+        <td>${evetHayirSelect(ziyaret3, 'ziyaret3-select')}</td>
+        <td>${actionCell(ziyaret3Not, 'note')}</td>
+        <td>${hucre(ziyaret3Tarih)}</td>
+        <td>${oyDiv(oy)}</td>
+        <td class="meta">${rowDate}</td>
+        <td><button type="button" class="btn-danger" onclick="sil(this)">Sil</button></td>
+      `;
+
+      qs('tablo').querySelector('tbody').appendChild(tr);
+      satirRenkGuncelle(tr);
+      applyHiddenColumns();
+      autoSaveDraft();
+      filtre();
+    }
+    const ISIM_STORAGE_KEY = "ozelIsimListesi";
+
+    const varsayilanKayitlar = [
+      { id: 1, isim: "1. Komite Üyesi Adayı" },
+      { id: 2, isim: "2. Komite Üyesi Adayı" },
+      { id: 3, isim: "3. Komite Üyesi Adayı" },
+      { id: 4, isim: "4. Komite Üyesi Adayı" },
+      { id: 5, isim: "5. Komite Üyesi Adayı" },
+      { id: 6, isim: "6. Komite Üyesi Adayı" },
+      { id: 7, isim: "7. Komite Üyesi Adayı" },
+      { id: 8, isim: "8. Komite Üyesi Adayı" },
+      { id: 9, isim: "9. Komite Üyesi Adayı" },
+      { id: 10, isim: "10. Komite Üyesi Adayı" },
+      { id: 11, isim: "11. Komite Üyesi Adayı" },
+      { id: 12, isim: "12. Komite Üyesi Adayı" }
+    ];
+
+    let kayitlar = JSON.parse(localStorage.getItem(ISIM_STORAGE_KEY)) || varsayilanKayitlar;
+    let aktifDuzenlemeId = null;
+
+    function kayitlariSakla() {
+      localStorage.setItem(ISIM_STORAGE_KEY, JSON.stringify(kayitlar));
+    }
+
+    function listeyiCiz() {
+      const alan = document.getElementById("isimSatirlari");
+      alan.innerHTML = "";
+
+      kayitlar.forEach((kayit) => {
+        const satir = document.createElement("div");
+        satir.className = "isim-satir";
+
+        if (aktifDuzenlemeId === kayit.id) {
+          satir.innerHTML = `
+            <div class="isim-hucre">${kayit.id}</div>
+            <div class="isim-hucre">
+              <input
+                id="isimGirdi-${kayit.id}"
+                class="isim-girdi"
+                type="text"
+                value="${kayit.isim}"
+              />
+            </div>
+            <div class="isim-hucre isim-hucre-son">
+              <div class="isim-aksiyon">
+                <button class="isim-buton isim-buton-kaydet" onclick="ismiKaydet(${kayit.id})">Kaydet</button>
+                <button class="isim-buton isim-buton-iptal" onclick="duzenlemeyiIptalEt()">İptal</button>
+              </div>
+            </div>
+          `;
+        } else {
+          satir.innerHTML = `
+            <div class="isim-hucre">${kayit.id}</div>
+            <div class="isim-hucre">${kayit.isim}</div>
+            <div class="isim-hucre isim-hucre-son">
+              <div class="isim-aksiyon">
+                <button class="isim-buton isim-buton-duzenle" onclick="duzenlemeyiBaslat(${kayit.id})">Düzenle</button>
+              </div>
+            </div>
+          `;
+        }
+
+        alan.appendChild(satir);
+      });
+    }
+
+    function duzenlemeyiBaslat(id) {
+      aktifDuzenlemeId = id;
+      listeyiCiz();
+    }
+
+    function ismiKaydet(id) {
+      const girdi = document.getElementById(`isimGirdi-${id}`);
+      const yeniIsim = girdi.value.trim();
+
+      if (!yeniIsim) {
+        alert("İsim boş bırakılamaz.");
+        return;
+      }
+
+      const hedefKayit = kayitlar.find(item => item.id === id);
+      if (hedefKayit) {
+        hedefKayit.isim = yeniIsim;
+      }
+
+      kayitlariSakla();
+      aktifDuzenlemeId = null;
+      listeyiCiz();
+    }
+
+    function duzenlemeyiIptalEt() {
+      aktifDuzenlemeId = null;
+      listeyiCiz();
+    }
+
+    listeyiCiz();
+    function resimInputDegisti(input) {
+      const wrapper = input.closest('.image-cell');
+      const img = wrapper.querySelector('.thumb');
+      img.src = input.value.trim();
+      autoSaveDraft();
+    }
+
+    async function resimSec(fileInput) {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      const wrapper = fileInput.closest('.image-cell');
+      const textInput = wrapper.querySelector('input.cell');
+      const img = wrapper.querySelector('.thumb');
+
+      const savedPath = await resmiKlasoreKaydet(file);
+      if (savedPath) {
+        textInput.value = savedPath;
+        img.src = savedPath;
+        img.style.visibility = 'visible';
+        autoSaveDraft();
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        textInput.value = e.target.result;
+        img.src = e.target.result;
+        img.style.visibility = 'visible';
+        autoSaveDraft();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function sil(btn) {
+      btn.closest('tr').remove();
+      autoSaveDraft();
+      filtre();
+    }
+
+    function oyDegistir(el) {
+      const order = ['SEÇ', 'HAYIR', 'ORTA', 'EVET'];
+      const current = el.dataset.val || 'SEÇ';
+      const next = order[(order.indexOf(current) + 1) % order.length];
+      const classMap = { 'SEÇ': 'none', 'HAYIR': 'hayir', 'ORTA': 'orta', 'EVET': 'evet' };
+      el.dataset.val = next;
+      el.textContent = next;
+      el.className = 'vote ' + classMap[next];
+      satirRenkGuncelle(el.closest('tr'));
+      autoSaveDraft();
+      filtre();
+    }
+
+    function durumDegisti(select) {
+      satirRenkGuncelle(select.closest('tr'));
+      autoSaveDraft();
+      loadChart();
+    }
+
+    function satirRenkGuncelle(row) {
+      if (!row) return;
+      row.classList.remove('row-none', 'row-hayir', 'row-orta', 'row-evet', 'row-excluded');
+      const vote = row.querySelector('.vote').dataset.val || 'SEÇ';
+      const aski = row.querySelector('.aski-select').value || 'EVET';
+      const ikiYil = row.querySelector('.ikiyil-select').value || 'EVET';
+      const voteMap = { 'SEÇ': 'row-none', 'HAYIR': 'row-hayir', 'ORTA': 'row-orta', 'EVET': 'row-evet' };
+      row.classList.add(voteMap[vote] || 'row-none');
+      if (aski === 'HAYIR' || ikiYil === 'HAYIR') row.classList.add('row-excluded');
+    }
+
+    function getCellValue(td) {
+      const input = td.querySelector('input.cell, textarea.cell, select.cell');
+      if (input) return input.value || '';
+      const vote = td.querySelector('.vote');
+      if (vote) return vote.dataset.val || vote.textContent || '';
+      return td.textContent || '';
+    }
+
+    function getTableData() {
+      const rows = [...qs('tablo').querySelectorAll('tbody tr')];
+      return rows.map(row => {
+        const cells = [...row.querySelectorAll('td')];
+        return {
+          veri: cells.slice(0, 25).map(td => getCellValue(td)),
+          aski: getCellValue(cells[25]),
+          ikiYil: getCellValue(cells[26]),
+          ziyaret1: getCellValue(cells[27]),
+          ziyaret1Not: getCellValue(cells[28]),
+          ziyaret1Tarih: getCellValue(cells[29]),
+          ziyaret2: getCellValue(cells[30]),
+          ziyaret2Not: getCellValue(cells[31]),
+          ziyaret2Tarih: getCellValue(cells[32]),
+          ziyaret3: getCellValue(cells[33]),
+          ziyaret3Not: getCellValue(cells[34]),
+          ziyaret3Tarih: getCellValue(cells[35]),
+          oy: getCellValue(cells[36]),
+          tarih: cells[37].textContent.trim()
+        };
+      });
+    }
+
+    function renderRows(data) {
+      const tbody = qs('tablo').querySelector('tbody');
+      tbody.innerHTML = '';
+      data.forEach(item => satirEkle(item));
+      if (!data.length) satirEkle();
+    }
+
+    function filtre() {
+      const oy = qs('oyFiltre').value;
+      const rows = [...qs('tablo').querySelectorAll('tbody tr')];
+      const hasAnyFilter = Boolean(oy || activeColumnFilter);
+
+      rows.forEach(row => {
+        row.classList.remove('filtered-row');
+        const rowVote = row.querySelector('.vote').dataset.val || 'SEÇ';
+        const oyUygun = !oy || rowVote === oy;
+        let kolonUygun = true;
+        if (activeColumnFilter) {
+          const cell = row.querySelectorAll('td')[activeColumnFilter.index];
+          const value = getCellValue(cell).toLowerCase();
+          kolonUygun = value.includes(activeColumnFilter.text.toLowerCase());
+        }
+        const show = oyUygun && kolonUygun;
+        row.style.display = show  '' : 'none';
+        if (show && hasAnyFilter) row.classList.add('filtered-row');
+      });
+    }
+
+    function filtreTemizle() {
+      qs('oyFiltre').value = '';
+      activeColumnFilter = null;
+      contextMenuKapat();
+      document.querySelectorAll('#tablo tbody tr').forEach(row => {
+        row.style.display = '';
+        row.classList.remove('filtered-row');
+      });
+    }
+
+    function kolonMenuAc(event, columnIndex) {
+      event.preventDefault();
+      contextMenuKapat();
+      const title = qs('tablo').querySelector(`th[data-col="${columnIndex}"]`).textContent || 'Kolon';
+      const menu = document.createElement('div');
+      menu.className = 'context-menu';
+      menu.innerHTML = `
+        <div class="context-menu-title">${escapeHtml(title)}</div>
+        <input id="contextFilterInput" class="input" placeholder="Metne göre filtrele">
+        <button type="button" id="contextApply">Filtrele</button>
+        <button type="button" id="contextClear">Bu Kolon Filtresini Temizle</button>
+        <button type="button" id="contextHide">Sütunu Gizle</button>
+      `;
+
+      menu.style.left = event.clientX + 'px';
+      menu.style.top = event.clientY + 'px';
+      document.body.appendChild(menu);
+
+      const input = menu.querySelector('#contextFilterInput');
+      input.focus();
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          activeColumnFilter = { index: columnIndex, text: input.value.trim() };
+          filtre();
+          contextMenuKapat();
+        }
+      });
+
+      menu.querySelector('#contextApply').onclick = () => {
+        activeColumnFilter = { index: columnIndex, text: input.value.trim() };
+        filtre();
+        contextMenuKapat();
+      };
+
+      menu.querySelector('#contextClear').onclick = () => {
+        if (activeColumnFilter && activeColumnFilter.index === columnIndex) activeColumnFilter = null;
+        filtre();
+        contextMenuKapat();
+      };
+
+      menu.querySelector('#contextHide').onclick = () => {
+        sutunGizle(columnIndex);
+        contextMenuKapat();
+      };
+
+      setTimeout(() => document.addEventListener('click', contextMenuKapat, { once: true }), 0);
+    }
+
+    function contextMenuKapat() {
+      document.querySelectorAll('.context-menu').forEach(menu => menu.remove());
+    }
+
+    function getHiddenColumns() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_HIDDEN_COLUMNS) || '[]'); } catch { return []; }
+    }
+
+    function setHiddenColumns(cols) {
+      localStorage.setItem(STORAGE_HIDDEN_COLUMNS, JSON.stringify(cols));
+    }
+
+    function sutunGizle(index) {
+      const hidden = getHiddenColumns();
+      if (!hidden.includes(index)) hidden.push(index);
+      setHiddenColumns(hidden.sort((a, b) => a - b));
+      applyHiddenColumns();
+      renderHiddenColumns();
+    }
+
+    function sutunGoster(index) {
+      const hidden = getHiddenColumns().filter(x => x !== index);
+      setHiddenColumns(hidden);
+      applyHiddenColumns();
+      renderHiddenColumns();
+    }
+
+    function applyHiddenColumns() {
+      const hidden = getHiddenColumns();
+      qs('tablo').querySelectorAll('tr').forEach(row => {
+        [...row.children].forEach((cell, idx) => {
+          cell.style.display = hidden.includes(idx)  'none' : '';
+        });
+      });
+    }
+
+    function renderHiddenColumns() {
+      const box = qs('hiddenColumnsBox');
+      const hidden = getHiddenColumns();
+      if (!hidden.length) {
+        box.innerHTML = '<span class="mini-note">Gizlenmiş sütun yok.</span>';
+        return;
+      }
+      box.innerHTML = '<span class="mini-note">Gizlenmiş sütunlar:</span>' + hidden.map(index => `
+        <button type="button" class="hidden-chip" onclick="sutunGoster(${index})">${escapeHtml(COLUMN_TITLES[index] || ('Sütun ' + index))} ekle</button>
+      `).join('');
+    }
+
+    function autoSaveDraft() {
+      localStorage.setItem(STORAGE_DRAFT, JSON.stringify(getTableData()));
+      loadChart();
+    }
+
+    function getDraft() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_DRAFT) || '[]'); } catch { return []; }
+    }
+
+    async function klasorSec() {
+      try {
+        if (!window.showDirectoryPicker) return;
+        imageDirectoryHandle = await window.showDirectoryPicker();
+        localStorage.setItem(STORAGE_IMAGE_DIR, imageDirectoryHandle.name || 'Seçili klasör');
+      } catch (e) {
+      }
+    }
+
+    async function resmiKlasoreKaydet(file) {
+      try {
+        if (!imageDirectoryHandle) return null;
+        const cleanName = (file.name || ('resim_' + Date.now() + '.png')).replace(/[^a-zA-Z0-9._-]/g, '_');
+        const target = await imageDirectoryHandle.getFileHandle(cleanName, { create: true });
+        const writable = await target.createWritable();
+        await writable.write(file);
+        await writable.close();
+        return cleanName;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function getHistory() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_HISTORY) || '[]'); } catch { return []; }
+    }
+
+    async function tumunuKaydet() {
+      const data = getTableData();
+      const canvas = await html2canvas(qs('tableArea'), { backgroundColor: '#ffffff', scale: 1.2 });
+      const history = getHistory();
+      history.push({
+        id: Date.now(),
+        tarih: tarih(),
+        satir: data.length,
+        img: canvas.toDataURL('image/png'),
+        data: data
+      });
+      localStorage.setItem(STORAGE_HISTORY, JSON.stringify(history));
+      localStorage.setItem(STORAGE_DRAFT, JSON.stringify(data));
+      renderHistory();
+      loadChart();
+      alert('Kayıt başarıyla alındı.');
+    }
+
+    function renderHistory() {
+      const history = [...getHistory()].reverse();
+      const cards = qs('cards');
+      if (!history.length) {
+        cards.innerHTML = '<div class="empty">Henüz kayıt yok. Anasayfada tabloyu doldurup Kaydet butonuna bas.</div>';
+        return;
+      }
+      cards.className = 'cards';
+      cards.innerHTML = history.map(item => `
+        <div class="card">
+          <img src="${item.img}" alt="Kayıt görünümü">
+          <div class="card-body">
+            <h3>Kayıt #${item.id}</h3>
+            <p><strong>Satır:</strong> ${item.satir}</p>
+            <p><strong>Tarih:</strong> ${item.tarih}</p>
+            <div class="card-actions">
+              <button type="button" class="btn-primary" onclick="kaydiYukle(${item.id})">Yükle</button>
+              <button type="button" class="btn-danger" onclick="kaydiSil(${item.id})">Sil</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function kaydiYukle(id) {
+      const item = getHistory().find(x => x.id === id);
+      if (!item) return;
+      renderRows(item.data || []);
+      showPage('ana');
+      autoSaveDraft();
+      alert('Kayıt tabloya yüklendi.');
+    }
+
+    function kaydiSil(id) {
+      localStorage.setItem(STORAGE_HISTORY, JSON.stringify(getHistory().filter(x => x.id !== id)));
+      renderHistory();
+      loadChart();
+    }
+
+    function sonKaydiYukle() {
+      const history = getHistory();
+      if (!history.length) return alert('Yüklenecek kayıt yok.');
+      renderRows(history[history.length - 1].data || []);
+      autoSaveDraft();
+      alert('Son kayıt yüklendi.');
+    }
+
+    function tabloTemizle() {
+      qs('tablo').querySelector('tbody').innerHTML = '';
+      satirEkle();
+      autoSaveDraft();
+    }
+
+    function loadChart() {
+      const history = getHistory();
+      const latest = history.length  history[history.length - 1] : null;
+      const counts = { EVET: 0, ORTA: 0, HAYIR: 0 };
+      let total = 0;
+
+      const source = latest && Array.isArray(latest.data)  latest.data : getTableData();
+      source.forEach(item => {
+        if (item.aski === 'HAYIR' || item.ikiYil === 'HAYIR') return;
+        total += 1;
+        if (counts[item.oy] !== undefined) counts[item.oy] += 1;
+      });
+
+      qs('statTotal').textContent = String(total);
+      qs('statEvet').textContent = String(counts.EVET);
+      qs('statOrta').textContent = String(counts.ORTA);
+      qs('statHayir').textContent = String(counts.HAYIR);
+
+      if (chartInstance) chartInstance.destroy();
+      chartInstance = new Chart(qs('chart'), {
+        type: 'pie',
+        data: {
+          labels: ['EVET', 'ORTA', 'HAYIR'],
+          datasets: [{
+            data: [counts.EVET, counts.ORTA, counts.HAYIR],
+            backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: 'bottom' } }
+        }
+      });
+    }
+
+    function sutunBoyutlandirBaslat(event, index) {
+      event.preventDefault();
+      event.stopPropagation();
+      const rows = [...qs('tablo').querySelectorAll('tr')];
+      const startX = event.clientX;
+      const header = qs('tablo').querySelector(`th[data-col="${index}"]`);
+      const startWidth = header  header.offsetWidth : 120;
+
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+
+      function onMove(e) {
+        const width = Math.max(70, startWidth + (e.clientX - startX));
+        rows.forEach(row => {
+          const cell = row.children[index];
+          if (cell) {
+            cell.style.width = width + 'px';
+            cell.style.minWidth = width + 'px';
+            cell.style.maxWidth = width + 'px';
+          }
+        });
+      }
+
+      function onUp() {
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    }
+
+    function excel() {
+      const exportTable = document.createElement('table');
+      const data = getTableData();
+      exportTable.innerHTML = `<tr>${COLUMN_TITLES.map(t => `<th>${escapeHtml(t)}</th>`).join('')}</tr>`;
+      data.forEach(item => {
+        const tr = document.createElement('tr');
+        [...item.veri, item.aski, item.ikiYil, item.ziyaret1, item.ziyaret1Not, item.ziyaret1Tarih, item.ziyaret2, item.ziyaret2Not, item.ziyaret2Tarih, item.ziyaret3, item.ziyaret3Not, item.ziyaret3Tarih, item.oy, item.tarih].forEach(val => {
+          const td = document.createElement('td');
+          td.textContent = val;
+          tr.appendChild(td);
+        });
+        exportTable.appendChild(tr);
+      });
+      const wb = XLSX.utils.table_to_book(exportTable, { sheet: 'Uyeler' });
+      XLSX.writeFile(wb, 'uyeler.xlsx');
+    }
+
+    function exceldenYukle(input) {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
+          if (!rows.length) return alert('Excel içinde veri bulunamadı.');
+
+          const body = rows.slice(1).filter(r => r.some(v => String(v).trim() !== ''));
+          const mapped = body.map(r => ({
+            veri: Array.from({ length: 25 }, (_, i) => r[i]  ''),
+            aski: (r[25] || 'EVET').toString().toUpperCase() === 'HAYIR'  'HAYIR' : 'EVET',
+            ikiYil: (r[26] || 'EVET').toString().toUpperCase() === 'HAYIR'  'HAYIR' : 'EVET',
+            ziyaret1: (r[27] || 'EVET').toString().toUpperCase() === 'HAYIR'  'HAYIR' : 'EVET',
+            ziyaret1Not: r[28]  String(r[28]) : '',
+            ziyaret1Tarih: r[29]  String(r[29]) : '',
+            ziyaret2: (r[30] || 'EVET').toString().toUpperCase() === 'HAYIR'  'HAYIR' : 'EVET',
+            ziyaret2Not: r[31]  String(r[31]) : '',
+            ziyaret2Tarih: r[32]  String(r[32]) : '',
+            ziyaret3: (r[33] || 'EVET').toString().toUpperCase() === 'HAYIR'  'HAYIR' : 'EVET',
+            ziyaret3Not: r[34]  String(r[34]) : '',
+            ziyaret3Tarih: r[35]  String(r[35]) : '',
+            oy: ['EVET','ORTA','HAYIR','SEÇ'].includes((r[36] || '').toString().toUpperCase())  (r[36] || '').toString().toUpperCase() : 'SEÇ',
+            tarih: r[37]  String(r[37]) : tarih()
+          }));
+
+          renderRows(mapped);
+          autoSaveDraft();
+          applyHiddenColumns();
+          alert('Excel verileri tabloya yüklendi.');
+        } catch (err) {
+          alert('Excel okunamadı. Başlık sırası sistemle aynı olmalı.');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+      input.value = '';
+    }
+
+    window.addEventListener('load', () => {
+      if (localStorage.getItem(STORAGE_SESSION) === '1') {
+        qs('loginPage').classList.add('hidden');
+        qs('app').classList.remove('hidden');
+        initializeApp();
+      }
+    });
+  </script>
+  <script src="app.js"></script>
+</body>
+</html>
