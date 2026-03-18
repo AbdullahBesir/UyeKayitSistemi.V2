@@ -1,6 +1,6 @@
 import json
-import secrets
 import os
+import secrets
 import sqlite3
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
