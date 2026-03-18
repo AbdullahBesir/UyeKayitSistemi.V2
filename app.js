@@ -1,4 +1,4 @@
-﻿(function() {
+(function() {
   try {
     window.localStorage.removeItem('uye_logged_in');
   } catch (error) {
@@ -7,9 +7,14 @@
   const API_PREFIX = '/api';
   const AUTH_HASH_ITERATIONS = 120000;
   const DATA_KEY_ITERATIONS = 180000;
-  const CURRENT_SCHEMA_VERSION = 2;
-  const BASE_VALUE_COUNT = 25;
+  const CURRENT_SCHEMA_VERSION = 3;
+  const BASE_VALUE_COUNT = 26;
+  const DISTRICT_COLUMN_INDEX = 9;
   const VOTE_SEQUENCE = ['SEÇ', 'HAYIR', 'ORTA', 'EVET'];
+  const SIVAS_DISTRICTS = [
+    'Merkez', 'Akıncılar', 'Altınyayla', 'Divriği', 'Doğanşar', 'Gemerek', 'Gölova', 'Gürün',
+    'Hafik', 'İmranlı', 'Kangal', 'Koyulhisar', 'Suşehri', 'Şarkışla', 'Ulaş', 'Yıldızeli', 'Zara'
+  ];
   const LEGACY_STORAGE_KEYS = {
     history: 'uye_history',
     draft: 'uye_draft',
@@ -32,7 +37,7 @@
     { id: 12, isim: '12. Komite Üyesi Adayı' }
   ];
   const COLUMN_TITLES = [
-    'Resim', 'Üye Sicil', 'Ticaret Sicil', 'Mersis No', 'Nace Kodu', 'Vergi No', 'Meslek Grubu', 'Ünvan', 'Adres',
+    'Resim', 'Üye Sicil', 'Ticaret Sicil', 'Mersis No', 'Nace Kodu', 'Vergi No', 'Meslek Grubu', 'Ünvan', 'Adres', 'İlçe',
     'Yetkili Adı-1', 'Yetkili Adı-2', 'Yetkili Adı-3', 'Firma Sabit Tel', 'Yetkili GSM.1', 'Yetkili GSM.2', 'Yetkili GSM.3',
     'E-mail', 'Instagram', 'Facebook', 'X', 'Linkedin', 'Referans.1', 'Referans.2', 'Referans.3', 'Not',
     'Ulusal Olma Durumu', 'Ziyaret 1', 'Ziyaret 1 Notu', 'Ziyaret 1 Tarihi', 'Ziyaret 2', 'Ziyaret 2 Notu',
@@ -41,29 +46,29 @@
   ];
   const HEADER_TITLES = ['Resim (Üye Resmi)', ...COLUMN_TITLES.slice(1)];
   const TABLE_INDEX = {
-    ULUSAL: 25,
-    ZIYARET1: 26,
-    ZIYARET1_NOT: 27,
-    ZIYARET1_TARIH: 28,
-    ZIYARET2: 29,
-    ZIYARET2_NOT: 30,
-    ZIYARET2_TARIH: 31,
-    TELEFON: 32,
-    TELEFON_NOT: 33,
-    TELEFON_TARIH: 34,
-    ASKI: 35,
-    IKI_YIL: 36,
-    OY: 37,
-    TARIH: 38
+    ULUSAL: 26,
+    ZIYARET1: 27,
+    ZIYARET1_NOT: 28,
+    ZIYARET1_TARIH: 29,
+    ZIYARET2: 30,
+    ZIYARET2_NOT: 31,
+    ZIYARET2_TARIH: 32,
+    TELEFON: 33,
+    TELEFON_NOT: 34,
+    TELEFON_TARIH: 35,
+    ASKI: 36,
+    IKI_YIL: 37,
+    OY: 38,
+    TARIH: 39
   };
-  const LEGACY_HIDDEN_COLUMN_MAP = {
+  const LEGACY_HIDDEN_COLUMN_MAP_V1_TO_V2 = {
     0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9,
     10: 10, 11: 11, 12: 12, 13: 13, 14: 14, 15: 15, 16: 16, 17: 17, 18: 18, 19: 19,
     20: 20, 21: 21, 22: 22, 23: 23, 24: 24, 25: 35, 26: 36, 27: 26, 28: 27, 29: 28,
     30: 29, 31: 30, 32: 31, 33: 32, 34: 33, 35: 34, 36: 37, 37: 38
   };
   const BASE_IMPORT_FIELDS = [
-    'image', 'uyeSicil', 'ticaretSicil', 'mersisNo', 'naceKodu', 'vergiNo', 'meslekGrubu', 'unvan', 'adres',
+    'image', 'uyeSicil', 'ticaretSicil', 'mersisNo', 'naceKodu', 'vergiNo', 'meslekGrubu', 'unvan', 'adres', 'ilce',
     'yetkiliAdi1', 'yetkiliAdi2', 'yetkiliAdi3', 'firmaSabitTel', 'yetkiliGsm1', 'yetkiliGsm2', 'yetkiliGsm3',
     'email', 'instagram', 'facebook', 'x', 'linkedin', 'referans1', 'referans2', 'referans3', 'not'
   ];
@@ -77,6 +82,7 @@
     meslekGrubu: [{ name: 'meslek grubu' }],
     unvan: [{ name: 'unvan' }],
     adres: [{ name: 'adres' }],
+    ilce: [{ name: 'ilce' }, { name: 'ilçe' }],
     yetkiliAdi1: [{ name: 'yetkili adi 1' }],
     yetkiliAdi2: [{ name: 'yetkili adi 2' }],
     yetkiliAdi3: [{ name: 'yetkili adi 3' }],
@@ -198,6 +204,21 @@
     return fallback;
   }
 
+  function normalizeTextKey(value) {
+    return String(nv(value, ''))
+      .trim()
+      .toLocaleLowerCase('tr-TR')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  }
+
+  function normalizeDistrict(value) {
+    const normalized = normalizeTextKey(value);
+    if (!normalized) return '';
+    const match = SIVAS_DISTRICTS.find(item => normalizeTextKey(item) === normalized);
+    return match || '';
+  }
+
   function normalizeVote(value) {
     const normalized = String(nv(value, '')).trim().toUpperCase();
     return VOTE_SEQUENCE.includes(normalized) ? normalized : 'SEÇ';
@@ -216,22 +237,39 @@
     }));
   }
 
-  function normalizeHiddenColumns(value, legacySchema = false) {
+  function migrateHiddenColumnIndex(index, sourceSchemaVersion = CURRENT_SCHEMA_VERSION) {
+    let nextIndex = Number(index);
+    if (!Number.isInteger(nextIndex)) return null;
+    if (sourceSchemaVersion < 2) nextIndex = LEGACY_HIDDEN_COLUMN_MAP_V1_TO_V2[nextIndex];
+    if (!Number.isInteger(nextIndex)) return null;
+    if (sourceSchemaVersion < 3 && nextIndex >= DISTRICT_COLUMN_INDEX) nextIndex += 1;
+    return nextIndex;
+  }
+
+  function normalizeHiddenColumns(value, sourceSchemaVersion = CURRENT_SCHEMA_VERSION) {
     if (!Array.isArray(value)) return [];
     return [...new Set(
       value
         .map(item => Number(item))
         .filter(item => Number.isInteger(item))
-        .map(item => legacySchema ? LEGACY_HIDDEN_COLUMN_MAP[item] : item)
+        .map(item => migrateHiddenColumnIndex(item, sourceSchemaVersion))
         .filter(item => Number.isInteger(item) && item >= 0 && item < COLUMN_TITLES.length)
     )].sort((a, b) => a - b);
   }
 
+  function migrateBaseValues(values, sourceSchemaVersion = CURRENT_SCHEMA_VERSION, row = {}) {
+    const nextValues = Array.isArray(values) ? values.map(item => String(nv(item, ''))) : [];
+    if (sourceSchemaVersion < 3) nextValues.splice(DISTRICT_COLUMN_INDEX, 0, String(nv(row.ilce, '')));
+    nextValues[DISTRICT_COLUMN_INDEX] = normalizeDistrict(nextValues[DISTRICT_COLUMN_INDEX]);
+    return Array.from({ length: BASE_VALUE_COUNT }, (_, index) => String(nv(nextValues[index], '')));
+  }
+
   function normalizeRowRecord(row = {}, options = {}) {
-    const legacySchema = Boolean(options.legacySchema);
+    const sourceSchemaVersion = Number(options.sourceSchemaVersion) || CURRENT_SCHEMA_VERSION;
+    const legacySchema = sourceSchemaVersion < 2;
     const values = Array.isArray(row.veri) ? row.veri : [];
     return {
-      veri: Array.from({ length: BASE_VALUE_COUNT }, (_, index) => String(nv(values[index], ''))),
+      veri: migrateBaseValues(values, sourceSchemaVersion, row),
       ulusal: normalizeYesNo(row.ulusal, 'HAYIR'),
       ziyaret1: normalizeYesNo(row.ziyaret1, 'HAYIR'),
       ziyaret1Not: String(nv(row.ziyaret1Not, '')),
@@ -249,24 +287,24 @@
     };
   }
 
-  function normalizeHistoryEntry(entry = {}, legacySchema = false) {
+  function normalizeHistoryEntry(entry = {}, sourceSchemaVersion = CURRENT_SCHEMA_VERSION) {
     return {
       id: Number(entry.id) || Date.now(),
       tarih: String(nv(entry.tarih, tarih())),
       satir: Number(entry.satir) || (Array.isArray(entry.data) ? entry.data.length : 0),
       img: String(nv(entry.img, '')),
-      data: Array.isArray(entry.data) ? entry.data.map(item => normalizeRowRecord(item, { legacySchema })) : []
+      data: Array.isArray(entry.data) ? entry.data.map(item => normalizeRowRecord(item, { sourceSchemaVersion })) : []
     };
   }
 
   function normalizeUserData(rawData) {
     const source = rawData && typeof rawData === 'object' ? rawData : {};
-    const legacySchema = !source.schemaVersion || Number(source.schemaVersion) < CURRENT_SCHEMA_VERSION;
+    const sourceSchemaVersion = Number(source.schemaVersion) || 1;
     return {
       schemaVersion: CURRENT_SCHEMA_VERSION,
-      history: Array.isArray(source.history) ? source.history.map(item => normalizeHistoryEntry(item, legacySchema)) : [],
-      draft: Array.isArray(source.draft) ? source.draft.map(item => normalizeRowRecord(item, { legacySchema })) : [],
-      hiddenColumns: normalizeHiddenColumns(source.hiddenColumns, legacySchema),
+      history: Array.isArray(source.history) ? source.history.map(item => normalizeHistoryEntry(item, sourceSchemaVersion)) : [],
+      draft: Array.isArray(source.draft) ? source.draft.map(item => normalizeRowRecord(item, { sourceSchemaVersion })) : [],
+      hiddenColumns: normalizeHiddenColumns(source.hiddenColumns, sourceSchemaVersion),
       imageDirName: String(nv(source.imageDirName, '')),
       isimListesi: normalizeNameRecords(source.isimListesi)
     };
@@ -540,7 +578,7 @@
         ${escapeHtml(title)}
         <span class="col-resizer" onmousedown="sutunBoyutlandirBaslat(event, ${index})"></span>
       </th>
-    `).join('') + '<th data-col="39">Sil</th>';
+    `).join('') + `<th data-col="${COLUMN_TITLES.length}">Sil</th>`;
   }
 
   function voteClass(value) {
@@ -555,8 +593,8 @@
 
   function hucre(value = '', type = 'text') {
     const safe = escapeHtml(value);
-    if (type === 'note') return `<textarea class="cell" oninput="autoSaveDraft()">${safe}</textarea>`;
-    return `<input class="cell" value="${safe}" oninput="autoSaveDraft()">`;
+    if (type === 'note') return `<textarea class="cell" oninput="autoSaveDraft(); filtre()">${safe}</textarea>`;
+    return `<input class="cell" value="${safe}" oninput="autoSaveDraft(); filtre()">`;
   }
 
   function oyDiv(value = 'SEÇ') {
@@ -567,6 +605,19 @@
   function evetHayirSelect(value = 'HAYIR', cls = '') {
     const normalized = normalizeYesNo(value, 'HAYIR');
     return `<select class="cell ${cls}" onchange="durumDegisti(this)"><option value="EVET" ${normalized === 'EVET' ? 'selected' : ''}>Evet</option><option value="HAYIR" ${normalized === 'HAYIR' ? 'selected' : ''}>Hayır</option></select>`;
+  }
+
+  function selectCell(options, value = '', cls = '', placeholder = 'Seçiniz') {
+    const normalizedValue = String(nv(value, ''));
+    const optionValues = options.includes(normalizedValue) ? options : [...options, normalizedValue].filter(Boolean);
+    return `<select class="cell ${cls}" onchange="autoSaveDraft(); filtre()">
+      <option value="">${escapeHtml(placeholder)}</option>
+      ${optionValues.map(option => `<option value="${escapeHtml(option)}" ${option === normalizedValue ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
+    </select>`;
+  }
+
+  function ilceSelect(value = '') {
+    return selectCell(SIVAS_DISTRICTS, normalizeDistrict(value), 'ilce-select', 'İlçe Seç');
   }
 
   function makeLink(url, type) {
@@ -599,7 +650,7 @@
     const link = linkType ? makeLink(value, linkType) : '';
     return `
       <div class="link-cell">
-        ${type === 'note' ? `<textarea class="cell" oninput="autoSaveDraft()">${safe}</textarea>` : `<input class="cell" value="${safe}" oninput="autoSaveDraft()">`}
+        ${type === 'note' ? `<textarea class="cell" oninput="autoSaveDraft(); filtre()">${safe}</textarea>` : `<input class="cell" value="${safe}" oninput="autoSaveDraft(); filtre()">`}
         ${link}
       </div>
     `;
@@ -704,22 +755,23 @@
       <td>${hucre(item.veri[6] || '')}</td>
       <td>${hucre(item.veri[7] || '')}</td>
       <td>${hucre(item.veri[8] || '')}</td>
-      <td>${hucre(item.veri[9] || '')}</td>
+      <td>${ilceSelect(item.veri[9] || '')}</td>
       <td>${hucre(item.veri[10] || '')}</td>
       <td>${hucre(item.veri[11] || '')}</td>
-      <td>${actionCell(item.veri[12] || '', 'text', 'phone')}</td>
+      <td>${hucre(item.veri[12] || '')}</td>
       <td>${actionCell(item.veri[13] || '', 'text', 'phone')}</td>
       <td>${actionCell(item.veri[14] || '', 'text', 'phone')}</td>
       <td>${actionCell(item.veri[15] || '', 'text', 'phone')}</td>
-      <td>${actionCell(item.veri[16] || '', 'text', 'email')}</td>
-      <td>${actionCell(item.veri[17] || '', 'text', 'social')}</td>
+      <td>${actionCell(item.veri[16] || '', 'text', 'phone')}</td>
+      <td>${actionCell(item.veri[17] || '', 'text', 'email')}</td>
       <td>${actionCell(item.veri[18] || '', 'text', 'social')}</td>
       <td>${actionCell(item.veri[19] || '', 'text', 'social')}</td>
       <td>${actionCell(item.veri[20] || '', 'text', 'social')}</td>
-      <td>${hucre(item.veri[21] || '')}</td>
+      <td>${actionCell(item.veri[21] || '', 'text', 'social')}</td>
       <td>${hucre(item.veri[22] || '')}</td>
       <td>${hucre(item.veri[23] || '')}</td>
-      <td>${actionCell(item.veri[24] || '', 'note')}</td>
+      <td>${hucre(item.veri[24] || '')}</td>
+      <td>${actionCell(item.veri[25] || '', 'note')}</td>
       <td>${evetHayirSelect(item.ulusal, 'ulusal-select')}</td>
       <td>${evetHayirSelect(item.ziyaret1, 'ziyaret1-select')}</td>
       <td>${actionCell(item.ziyaret1Not, 'note')}</td>
@@ -787,6 +839,44 @@
     renderHiddenColumns();
   }
 
+  function getColumnFilterDefinition(columnIndex) {
+    if (columnIndex === DISTRICT_COLUMN_INDEX) {
+      return { type: 'exact', options: SIVAS_DISTRICTS, placeholder: 'Tüm İlçeler' };
+    }
+    if ([
+      TABLE_INDEX.ULUSAL,
+      TABLE_INDEX.ZIYARET1,
+      TABLE_INDEX.ZIYARET2,
+      TABLE_INDEX.TELEFON,
+      TABLE_INDEX.ASKI,
+      TABLE_INDEX.IKI_YIL
+    ].includes(columnIndex)) {
+      return { type: 'exact', options: ['EVET', 'HAYIR'], placeholder: 'Tüm Durumlar' };
+    }
+    if (columnIndex === TABLE_INDEX.OY) {
+      return { type: 'exact', options: VOTE_SEQUENCE, placeholder: 'Tüm Oylar' };
+    }
+    return { type: 'includes' };
+  }
+
+  function getFilterLabel(value) {
+    if (value === 'EVET') return 'Evet';
+    if (value === 'HAYIR') return 'Hayır';
+    if (value === 'SEÇ') return 'Seç';
+    return value;
+  }
+
+  function applyColumnFilter(columnIndex, value, match = 'includes') {
+    const trimmedValue = String(nv(value, '')).trim();
+    if (!trimmedValue) {
+      if (activeColumnFilter && activeColumnFilter.index === columnIndex) activeColumnFilter = null;
+    } else {
+      activeColumnFilter = { index: columnIndex, text: trimmedValue, match };
+    }
+    filtre();
+    contextMenuKapat();
+  }
+
   function filtre() {
     const oy = qs('oyFiltre').value;
     const rows = [...qs('tablo').querySelectorAll('tbody tr')];
@@ -798,7 +888,10 @@
       let kolonUygun = true;
       if (activeColumnFilter) {
         const cell = row.querySelectorAll('td')[activeColumnFilter.index];
-        kolonUygun = getCellValue(cell).toLowerCase().includes(activeColumnFilter.text.toLowerCase());
+        const cellValue = getCellValue(cell);
+        kolonUygun = activeColumnFilter.match === 'exact'
+          ? normalizeTextKey(cellValue) === normalizeTextKey(activeColumnFilter.text)
+          : normalizeTextKey(cellValue).includes(normalizeTextKey(activeColumnFilter.text));
       }
       const show = oyUygun && kolonUygun;
       row.style.display = show ? '' : 'none';
@@ -820,11 +913,21 @@
     event.preventDefault();
     contextMenuKapat();
     const title = qs('tablo').querySelector(`th[data-col="${columnIndex}"]`).textContent || 'Kolon';
+    const filterDefinition = getColumnFilterDefinition(columnIndex);
+    const activeValue = activeColumnFilter && activeColumnFilter.index === columnIndex ? activeColumnFilter.text : '';
     const menu = document.createElement('div');
     menu.className = 'context-menu';
     menu.innerHTML = `
       <div class="context-menu-title">${escapeHtml(title)}</div>
-      <input id="contextFilterInput" class="input" placeholder="Metne göre filtrele">
+      ${filterDefinition.type === 'exact'
+        ? `<select id="contextFilterInput" class="input">
+            <option value="">${escapeHtml(filterDefinition.placeholder || 'Tümü')}</option>
+            ${filterDefinition.options.map(option => `
+              <option value="${escapeHtml(option)}" ${option === activeValue ? 'selected' : ''}>${escapeHtml(getFilterLabel(option))}</option>
+            `).join('')}
+          </select>`
+        : `<input id="contextFilterInput" class="input" placeholder="Metne göre filtrele" value="${escapeHtml(activeValue)}">`
+      }
       <button type="button" id="contextApply">Filtrele</button>
       <button type="button" id="contextClear">Bu kolon filtresini temizle</button>
       <button type="button" id="contextHide">Sütunu gizle</button>
@@ -835,21 +938,13 @@
     const input = menu.querySelector('#contextFilterInput');
     input.focus();
     input.addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
-        activeColumnFilter = { index: columnIndex, text: input.value.trim() };
-        filtre();
-        contextMenuKapat();
-      }
+      if (e.key === 'Enter') applyColumnFilter(columnIndex, input.value, filterDefinition.type);
     });
     menu.querySelector('#contextApply').onclick = () => {
-      activeColumnFilter = { index: columnIndex, text: input.value.trim() };
-      filtre();
-      contextMenuKapat();
+      applyColumnFilter(columnIndex, input.value, filterDefinition.type);
     };
     menu.querySelector('#contextClear').onclick = () => {
-      if (activeColumnFilter && activeColumnFilter.index === columnIndex) activeColumnFilter = null;
-      filtre();
-      contextMenuKapat();
+      applyColumnFilter(columnIndex, '', filterDefinition.type);
     };
     menu.querySelector('#contextHide').onclick = () => {
       sutunGizle(columnIndex);
@@ -929,6 +1024,7 @@
   function resimInputDegisti(input) {
     input.closest('.image-cell').querySelector('.thumb').src = input.value.trim();
     autoSaveDraft();
+    filtre();
   }
 
   async function ensureDirectoryPermission(handle, write = false) {
@@ -1008,6 +1104,7 @@
     satirRenkGuncelle(select.closest('tr'));
     autoSaveDraft();
     loadChart();
+    filtre();
   }
 
   async function tumunuKaydet() {
@@ -1075,6 +1172,7 @@
   }
 
   function tabloTemizle() {
+    if (!window.confirm('Tablodaki tüm satırlar temizlensin mi? Bu işlem mevcut taslağı sıfırlar.')) return;
     renderRows([]);
   }
 
@@ -1126,10 +1224,10 @@
     });
   }
 
-  function mapExcelRowByPosition(row, legacy = false) {
-    if (legacy) {
+  function mapExcelRowByPosition(row, sourceSchemaVersion = CURRENT_SCHEMA_VERSION) {
+    if (sourceSchemaVersion < 2) {
       return normalizeRowRecord({
-        veri: Array.from({ length: BASE_VALUE_COUNT }, (_, index) => nv(row[index], '')),
+        veri: Array.from({ length: 25 }, (_, index) => nv(row[index], '')),
         ziyaret1: nv(row[27], 'HAYIR'),
         ziyaret1Not: nv(row[28], ''),
         ziyaret1Tarih: nv(row[29], ''),
@@ -1143,24 +1241,43 @@
         ikiYil: nv(row[26], 'EVET'),
         oy: nv(row[36], 'SEÇ'),
         tarih: nv(row[37], tarih())
-      }, { legacySchema: true });
+      }, { sourceSchemaVersion });
+    }
+    if (sourceSchemaVersion < 3) {
+      return normalizeRowRecord({
+        veri: Array.from({ length: 25 }, (_, index) => nv(row[index], '')),
+        ulusal: nv(row[25], 'HAYIR'),
+        ziyaret1: nv(row[26], 'HAYIR'),
+        ziyaret1Not: nv(row[27], ''),
+        ziyaret1Tarih: nv(row[28], ''),
+        ziyaret2: nv(row[29], 'HAYIR'),
+        ziyaret2Not: nv(row[30], ''),
+        ziyaret2Tarih: nv(row[31], ''),
+        telefonGorusmesi: nv(row[32], 'HAYIR'),
+        telefonGorusmesiNot: nv(row[33], ''),
+        telefonGorusmesiTarih: nv(row[34], ''),
+        aski: nv(row[35], 'HAYIR'),
+        ikiYil: nv(row[36], 'HAYIR'),
+        oy: nv(row[37], 'SEÇ'),
+        tarih: nv(row[38], tarih())
+      }, { sourceSchemaVersion });
     }
     return normalizeRowRecord({
       veri: Array.from({ length: BASE_VALUE_COUNT }, (_, index) => nv(row[index], '')),
-      ulusal: nv(row[25], 'HAYIR'),
-      ziyaret1: nv(row[26], 'HAYIR'),
-      ziyaret1Not: nv(row[27], ''),
-      ziyaret1Tarih: nv(row[28], ''),
-      ziyaret2: nv(row[29], 'HAYIR'),
-      ziyaret2Not: nv(row[30], ''),
-      ziyaret2Tarih: nv(row[31], ''),
-      telefonGorusmesi: nv(row[32], 'HAYIR'),
-      telefonGorusmesiNot: nv(row[33], ''),
-      telefonGorusmesiTarih: nv(row[34], ''),
-      aski: nv(row[35], 'HAYIR'),
-      ikiYil: nv(row[36], 'HAYIR'),
-      oy: nv(row[37], 'SEÇ'),
-      tarih: nv(row[38], tarih())
+      ulusal: nv(row[26], 'HAYIR'),
+      ziyaret1: nv(row[27], 'HAYIR'),
+      ziyaret1Not: nv(row[28], ''),
+      ziyaret1Tarih: nv(row[29], ''),
+      ziyaret2: nv(row[30], 'HAYIR'),
+      ziyaret2Not: nv(row[31], ''),
+      ziyaret2Tarih: nv(row[32], ''),
+      telefonGorusmesi: nv(row[33], 'HAYIR'),
+      telefonGorusmesiNot: nv(row[34], ''),
+      telefonGorusmesiTarih: nv(row[35], ''),
+      aski: nv(row[36], 'HAYIR'),
+      ikiYil: nv(row[37], 'HAYIR'),
+      oy: nv(row[38], 'SEÇ'),
+      tarih: nv(row[39], tarih())
     });
   }
 
@@ -1193,7 +1310,8 @@
         const headerMap = buildImportHeaderMap(headers);
         const recognized = Object.keys(headerMap).length;
         const looksLegacy = normalizeHeaderValue(headers[25]) === 'aski olmama durumu' || normalizeHeaderValue(headers[33]) === 'ziyaret 3';
-        renderRows(body.map(row => recognized >= 10 ? mapExcelRowWithHeaders(row, headerMap) : mapExcelRowByPosition(row, looksLegacy)));
+        const positionalSchemaVersion = looksLegacy ? 1 : (headers.length >= COLUMN_TITLES.length ? 3 : 2);
+        renderRows(body.map(row => recognized >= 10 ? mapExcelRowWithHeaders(row, headerMap) : mapExcelRowByPosition(row, positionalSchemaVersion)));
         applyHiddenColumns();
         alert('Excel verileri tabloya yüklendi.');
       } catch (error) {
