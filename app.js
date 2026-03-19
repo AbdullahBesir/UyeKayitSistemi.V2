@@ -8,6 +8,7 @@
   const AUTH_HASH_ITERATIONS = 120000;
   const DATA_KEY_ITERATIONS = 180000;
   const CURRENT_SCHEMA_VERSION = 3;
+  const LOCAL_PROFILE_CACHE_PREFIX = 'uye_profile_cache_v1:';
   const BASE_VALUE_COUNT = 26;
   const DISTRICT_COLUMN_INDEX = 9;
   const VOTE_SEQUENCE = ['SEÇ', 'HAYIR', 'ORTA', 'EVET'];
@@ -133,6 +134,7 @@
     currentUser: null,
     authToken: '',
     userData: buildDefaultUserData(),
+    profileUpdatedAt: 0,
     persistTimer: null
   };
 
@@ -356,6 +358,56 @@
     }
   }
 
+  function getLocalProfileCacheKey(username) {
+    const normalizedUsername = String(nv(username, '')).trim().toLocaleLowerCase('tr-TR');
+    return normalizedUsername ? `${LOCAL_PROFILE_CACHE_PREFIX}${normalizedUsername}` : '';
+  }
+
+  function readLocalProfileCache(username) {
+    const key = getLocalProfileCacheKey(username);
+    if (!key) return null;
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      return {
+        savedAt: Number(parsed.savedAt) || 0,
+        userData: normalizeUserData(parsed.userData)
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function writeLocalProfileCache(username, userData, savedAt = Date.now()) {
+    const key = getLocalProfileCacheKey(username);
+    if (!key) return;
+    try {
+      window.localStorage.setItem(key, JSON.stringify({
+        savedAt: Number(savedAt) || Date.now(),
+        userData: normalizeUserData(userData)
+      }));
+    } catch (error) {
+    }
+  }
+
+  function resolveUserData(username, remoteUserData, remoteUpdatedAt = 0) {
+    const normalizedRemoteData = normalizeUserData(remoteUserData || buildDefaultUserData());
+    const normalizedRemoteUpdatedAt = Number(remoteUpdatedAt) || 0;
+    const localCache = readLocalProfileCache(username);
+    if (localCache && (!normalizedRemoteUpdatedAt || localCache.savedAt > normalizedRemoteUpdatedAt)) {
+      return {
+        userData: localCache.userData,
+        updatedAt: localCache.savedAt
+      };
+    }
+    return {
+      userData: normalizedRemoteData,
+      updatedAt: normalizedRemoteUpdatedAt
+    };
+  }
+
   function bytesToBase64(bytes) {
     let binary = '';
     bytes.forEach(byte => {
@@ -441,7 +493,7 @@
   }
 
   async function saveUserData(data) {
-    await apiRequest('/profile', {
+    return apiRequest('/profile', {
       method: 'PUT',
       body: { userData: normalizeUserData(data) }
     });
@@ -449,12 +501,14 @@
 
   async function persistCurrentUserData() {
     if (!state.currentUser || !state.authToken) return;
-    await saveUserData(state.userData);
+    const response = await saveUserData(state.userData);
+    state.profileUpdatedAt = Number(response && response.updatedAt) || Date.now();
+    writeLocalProfileCache(state.currentUser, state.userData, state.profileUpdatedAt);
   }
 
   async function loadUserData() {
     const response = await apiRequest('/profile');
-    return normalizeUserData(response.userData || buildDefaultUserData());
+    return resolveUserData(state.currentUser, response.userData, response.updatedAt);
   }
 
   async function saveDirectoryHandleForCurrentUser(handle) {
@@ -542,9 +596,12 @@
         method: 'POST',
         body: { username, password }
       });
+      const resolvedProfile = resolveUserData(username, response.userData, response.updatedAt);
       state.currentUser = username;
       state.authToken = response.token || '';
-      state.userData = normalizeUserData(response.userData || buildDefaultUserData());
+      state.userData = resolvedProfile.userData;
+      state.profileUpdatedAt = resolvedProfile.updatedAt;
+      writeLocalProfileCache(username, state.userData, state.profileUpdatedAt || Date.now());
       kayitlar = normalizeNameRecords(state.userData.isimListesi);
       aktifDuzenlemeId = null;
       imageDirectoryHandle = await loadDirectoryHandleForUser(username);
@@ -698,6 +755,7 @@
 
   function queuePersistUserData(immediate = false) {
     if (!state.currentUser) return;
+    writeLocalProfileCache(state.currentUser, state.userData, Date.now());
     if (state.persistTimer) {
       clearTimeout(state.persistTimer);
       state.persistTimer = null;
