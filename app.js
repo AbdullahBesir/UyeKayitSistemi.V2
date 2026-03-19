@@ -9,6 +9,7 @@
   const DATA_KEY_ITERATIONS = 180000;
   const CURRENT_SCHEMA_VERSION = 3;
   const LOCAL_PROFILE_CACHE_PREFIX = 'uye_profile_cache_v1:';
+  const CELL_NOTIFICATION_DURATION_MS = 2400;
   const BASE_VALUE_COUNT = 26;
   const DISTRICT_COLUMN_INDEX = 9;
   const VOTE_SEQUENCE = ['SEÇ', 'HAYIR', 'ORTA', 'EVET'];
@@ -130,6 +131,9 @@
   let aktifDuzenlemeId = null;
   let kayitlar = cloneDefaultNameRecords();
   let loginLockInterval = null;
+  let activeNotificationCell = null;
+  let activeNotificationControl = null;
+  let notificationTimer = null;
   const state = {
     currentUser: null,
     authToken: '',
@@ -721,6 +725,52 @@
     return td.textContent || '';
   }
 
+  function clearCellNotification() {
+    if (notificationTimer) {
+      clearTimeout(notificationTimer);
+      notificationTimer = null;
+    }
+    if (activeNotificationCell) {
+      activeNotificationCell.classList.remove('cell-notification');
+      activeNotificationCell = null;
+    }
+    if (activeNotificationControl) {
+      activeNotificationControl.classList.remove('cell-notification-control');
+      activeNotificationControl = null;
+    }
+  }
+
+  function getTableCellTarget(target) {
+    if (!target || !target.closest) return null;
+    const cell = target.closest('#tablo tbody td');
+    if (!cell) return null;
+    if (target.closest('button')) return null;
+    return cell;
+  }
+
+  function getTableCellControl(cell, target) {
+    if (target && target.matches && target.matches('.cell, .vote, .image-cell, .link-cell')) return target;
+    return cell.querySelector('.cell, .vote, .image-cell, .link-cell');
+  }
+
+  function notifyTableCell(target) {
+    const cell = getTableCellTarget(target);
+    if (!cell) return;
+    const control = getTableCellControl(cell, target);
+    clearCellNotification();
+    activeNotificationCell = cell;
+    activeNotificationCell.classList.add('cell-notification');
+    if (control) {
+      activeNotificationControl = control;
+      activeNotificationControl.classList.add('cell-notification-control');
+    }
+    notificationTimer = window.setTimeout(clearCellNotification, CELL_NOTIFICATION_DURATION_MS);
+  }
+
+  function handleTableNotificationEvent(event) {
+    notifyTableCell(event.target);
+  }
+
   function getTableData() {
     const rows = [...qs('tablo').querySelectorAll('tbody tr')];
     return rows.map(row => {
@@ -855,6 +905,7 @@
 
   function renderRows(data = []) {
     const tbody = qs('tablo').querySelector('tbody');
+    clearCellNotification();
     tbody.innerHTML = '';
     if (Array.isArray(data) && data.length) data.forEach(item => satirEkle(item, { skipSave: true }));
     else satirEkle(null, { skipSave: true });
@@ -1460,6 +1511,8 @@
       autoSaveDraft
     });
     renderTableHeader();
+    qs('tablo').addEventListener('click', handleTableNotificationEvent);
+    qs('tablo').addEventListener('focusin', handleTableNotificationEvent);
     await seedDefaultUsers();
     try {
       const defaultUser = await apiRequest('/default-user');
