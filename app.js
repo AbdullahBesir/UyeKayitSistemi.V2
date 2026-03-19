@@ -737,9 +737,10 @@
 
   function getTableCellTarget(target) {
     if (!target || !target.closest) return null;
+    if (target.matches && target.matches('input, textarea, select, button, a, label')) return null;
+    if (target.closest('input, textarea, select, button, a, label')) return null;
     const cell = target.closest('#tablo tbody td');
     if (!cell) return null;
-    if (target.closest('button')) return null;
     return cell;
   }
 
