@@ -131,8 +131,7 @@
   let aktifDuzenlemeId = null;
   let kayitlar = cloneDefaultNameRecords();
   let loginLockInterval = null;
-  let activeNotificationCell = null;
-  let activeNotificationControl = null;
+  let activeNotificationRow = null;
   let notificationTimer = null;
   const state = {
     currentUser: null,
@@ -730,13 +729,9 @@
       clearTimeout(notificationTimer);
       notificationTimer = null;
     }
-    if (activeNotificationCell) {
-      activeNotificationCell.classList.remove('cell-notification');
-      activeNotificationCell = null;
-    }
-    if (activeNotificationControl) {
-      activeNotificationControl.classList.remove('cell-notification-control');
-      activeNotificationControl = null;
+    if (activeNotificationRow) {
+      activeNotificationRow.classList.remove('row-notification');
+      activeNotificationRow = null;
     }
   }
 
@@ -748,22 +743,14 @@
     return cell;
   }
 
-  function getTableCellControl(cell, target) {
-    if (target && target.matches && target.matches('.cell, .vote, .image-cell, .link-cell')) return target;
-    return cell.querySelector('.cell, .vote, .image-cell, .link-cell');
-  }
-
   function notifyTableCell(target) {
     const cell = getTableCellTarget(target);
     if (!cell) return;
-    const control = getTableCellControl(cell, target);
+    const row = cell.closest('tr');
+    if (!row) return;
     clearCellNotification();
-    activeNotificationCell = cell;
-    activeNotificationCell.classList.add('cell-notification');
-    if (control) {
-      activeNotificationControl = control;
-      activeNotificationControl.classList.add('cell-notification-control');
-    }
+    activeNotificationRow = row;
+    activeNotificationRow.classList.add('row-notification');
     notificationTimer = window.setTimeout(clearCellNotification, CELL_NOTIFICATION_DURATION_MS);
   }
 
