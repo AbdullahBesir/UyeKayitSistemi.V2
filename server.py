@@ -102,12 +102,13 @@ def init_db():
             (DEFAULT_USERNAME,),
         ).fetchone()
         if not existing_profile:
+            ts = now_ms()
             conn.execute(
                 """
                 INSERT INTO profiles (username, schema_version, data_json, updated_at)
                 VALUES (?, ?, ?, ?)
                 """,
-                (DEFAULT_USERNAME, CURRENT_SCHEMA_VERSION, json.dumps(default_user_data(), ensure_ascii=False), now_ms()),
+                (DEFAULT_USERNAME, CURRENT_SCHEMA_VERSION, json.dumps(default_user_data(), ensure_ascii=False), ts),
             )
 
 
@@ -208,21 +209,30 @@ class AppHandler(SimpleHTTPRequestHandler):
             )
 
             profile = conn.execute(
-                "SELECT data_json FROM profiles WHERE username = ?",
+                "SELECT data_json, updated_at FROM profiles WHERE username = ?",
                 (username,),
             ).fetchone()
             if profile:
                 user_data = json.loads(profile["data_json"])
+                profile_updated_at = int(profile["updated_at"] or 0)
             else:
                 user_data = default_user_data()
+                profile_updated_at = now_ms()
                 conn.execute(
                     "INSERT INTO profiles (username, schema_version, data_json, updated_at) VALUES (?, ?, ?, ?)",
-                    (username, CURRENT_SCHEMA_VERSION, json.dumps(user_data, ensure_ascii=False), now_ms()),
+                    (username, CURRENT_SCHEMA_VERSION, json.dumps(user_data, ensure_ascii=False), profile_updated_at),
                 )
 
         token = secrets.token_urlsafe(32)
         SESSIONS[token] = username
-        self._send_json({"token": token, "username": username, "userData": user_data})
+        self._send_json(
+            {
+                "token": token,
+                "username": username,
+                "userData": user_data,
+                "updatedAt": profile_updated_at,
+            }
+        )
 
     def _handle_get_profile(self):
         username = self._get_auth_username()
@@ -231,18 +241,20 @@ class AppHandler(SimpleHTTPRequestHandler):
             return
         with get_conn() as conn:
             profile = conn.execute(
-                "SELECT data_json FROM profiles WHERE username = ?",
+                "SELECT data_json, updated_at FROM profiles WHERE username = ?",
                 (username,),
             ).fetchone()
             if not profile:
                 user_data = default_user_data()
+                profile_updated_at = now_ms()
                 conn.execute(
                     "INSERT INTO profiles (username, schema_version, data_json, updated_at) VALUES (?, ?, ?, ?)",
-                    (username, CURRENT_SCHEMA_VERSION, json.dumps(user_data, ensure_ascii=False), now_ms()),
+                    (username, CURRENT_SCHEMA_VERSION, json.dumps(user_data, ensure_ascii=False), profile_updated_at),
                 )
             else:
                 user_data = json.loads(profile["data_json"])
-        self._send_json({"userData": user_data})
+                profile_updated_at = int(profile["updated_at"] or 0)
+        self._send_json({"userData": user_data, "updatedAt": profile_updated_at})
 
     def _handle_put_profile(self):
         username = self._get_auth_username()
@@ -254,6 +266,7 @@ class AppHandler(SimpleHTTPRequestHandler):
         if not isinstance(user_data, dict):
             self._send_json({"error": "Geçersiz veri."}, status=400)
             return
+        ts = now_ms()
         with get_conn() as conn:
             conn.execute(
                 """
@@ -264,9 +277,9 @@ class AppHandler(SimpleHTTPRequestHandler):
                   data_json=excluded.data_json,
                   updated_at=excluded.updated_at
                 """,
-                (username, CURRENT_SCHEMA_VERSION, json.dumps(user_data, ensure_ascii=False), now_ms()),
+                (username, CURRENT_SCHEMA_VERSION, json.dumps(user_data, ensure_ascii=False), ts),
             )
-        self._send_json({"ok": True})
+        self._send_json({"ok": True, "updatedAt": ts})
 
     def do_GET(self):
         parsed = urlparse(self.path)
